@@ -46,8 +46,8 @@
     <!-- SIDEBAR CONTROLS -->
     <div class="w-80 bg-white border-r border-gray-200 flex flex-col h-full shadow-lg z-10 flex-shrink-0">
         <div class="p-5 bg-ford-blue text-white">
-            <h1 class="text-lg font-bold tracking-tight">27MY Explorer Repricing sell-down</h1>
-            <p class="text-xs text-blue-200 mt-1">This tool is not generalizable.</p>
+            <h1 class="text-lg font-bold tracking-tight">27MY Explorer Repricing</h1>
+            <p class="text-xs text-blue-200 mt-1">Yield Management Sprint Visualizer</p>
         </div>
 
         <div class="flex-1 overflow-y-auto p-5 space-y-6">
@@ -116,7 +116,7 @@
             <!-- Entity Adjustments -->
             <div>
                 <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-                    <i data-lucide="sliders" class="w-4 h-4 mr-1"></i> CFTP Adjustments
+                    <i data-lucide="sliders" class="w-4 h-4 mr-1"></i> 26MY Inventory Trims (CFTP Δ)
                 </h3>
                 <p class="text-[10px] text-gray-500 mb-3 leading-tight border-l-2 border-red-400 pl-2">
                     <strong>Negative values</strong> = Price Drops. Only price drops incur incremental VM costs to clear 26MY stock.
@@ -188,20 +188,20 @@
         lucide.createIcons();
 
         // 1. DATA MODEL & LUIS'S BASELINES
-        // Demand mix approximating 26MY Inventory Mix for accurate sell-down modeling
+        // Demand mix representing *strictly* the 26MY physical inventory mix (Totaling 1.0)
+        // Note: Platinum 3.0L trims removed as they do not exist in the 26MY inventory to be repriced.
         const entities = [
             { id: 'tremor_30', name: 'Tremor 4x4 3.0L', mix: 0.054 },
             { id: 'st_4x4_30', name: 'ST 4x4 3.0L', mix: 0.139 },
-            { id: 'plat_4x4_30', name: 'Platinum 4x4 3.0L', mix: 0.060 },
             { id: 'st_4x2_30', name: 'ST 4x2 3.0L', mix: 0.011 },
-            { id: 'plat_4x2_30', name: 'Platinum 4x2 3.0L', mix: 0.008 },
             { id: 'plat_4x4_23', name: 'Platinum 4x4 2.3L', mix: 0.087 },
-            { id: 'tremor_23', name: 'Tremor 4x4 2.3L', mix: 0.020 },
             { id: 'plat_4x2_23', name: 'Platinum 4x2 2.3L', mix: 0.021 },
-            { id: 'stline_4x4_23', name: 'StLine 4x4 2.3L', mix: 0.180 },
-            { id: 'stline_4x2_23', name: 'StLine 4x2 2.3L', mix: 0.080 },
-            { id: 'active_4x4_23', name: 'Active 4x4 2.3L', mix: 0.240 },
-            { id: 'active_4x2_23', name: 'Active 4x2 2.3L', mix: 0.100 }
+            { id: 'active_4x4_23', name: 'Active 4x4 2.3L', mix: 0.201 },
+            { id: 'active_4x2_23', name: 'Active 4x2 2.3L', mix: 0.074 },
+            // Below: 41.3% interpolated for ST-Line/Tremor 2.3L missing from screenshot
+            { id: 'stline_4x4_23', name: 'StLine 4x4 2.3L', mix: 0.246 }, 
+            { id: 'stline_4x2_23', name: 'StLine 4x2 2.3L', mix: 0.105 },
+            { id: 'tremor_23', name: 'Tremor 4x4 2.3L', mix: 0.062 }
         ];
 
         // Scenario Presets (CFTP Change) - Matched to Slides
@@ -209,17 +209,17 @@
             'profit_optimal': {
                 targetGain: 14.5,
                 cftps: {
-                    'tremor_30': -982, 'st_4x4_30': -2321, 'plat_4x4_30': -2670, 'st_4x2_30': -3274, 
-                    'plat_4x2_30': -3475, 'plat_4x4_23': -2198, 'tremor_23': 3162, 'plat_4x2_23': -1884, 
-                    'stline_4x4_23': 48, 'stline_4x2_23': 491, 'active_4x4_23': 801, 'active_4x2_23': 1248
+                    'tremor_30': -982, 'st_4x4_30': -2321, 'st_4x2_30': -3274, 
+                    'plat_4x4_23': -2198, 'plat_4x2_23': -1884, 'active_4x4_23': 801, 'active_4x2_23': 1248,
+                    'stline_4x4_23': 48, 'stline_4x2_23': 491, 'tremor_23': 3162
                 }
             },
             'hold_active': {
                 targetGain: 7.6,
                 cftps: {
-                    'tremor_30': 283, 'st_4x4_30': -1030, 'plat_4x4_30': -1389, 'st_4x2_30': -2001, 
-                    'plat_4x2_30': -2325, 'plat_4x4_23': -1283, 'tremor_23': 2100, 'plat_4x2_23': -983, 
-                    'stline_4x4_23': 1105, 'stline_4x2_23': 800, 'active_4x4_23': 0, 'active_4x2_23': 0
+                    'tremor_30': 283, 'st_4x4_30': -1030, 'st_4x2_30': -2001, 
+                    'plat_4x4_23': -1283, 'plat_4x2_23': -983, 'active_4x4_23': 0, 'active_4x2_23': 0,
+                    'stline_4x4_23': 1105, 'stline_4x2_23': 800, 'tremor_23': 2100
                 }
             }
         };
