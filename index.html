@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>27MY Explorer Repricing ROI Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .ford-blue { color: #003478; }
+        .bg-ford-blue { background-color: #003478; }
+        
+        /* Custom Scrollbar for side panel */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden text-gray-800">
+
+    <!-- SIDEBAR CONTROLS -->
+    <div class="w-80 bg-white border-r border-gray-200 flex flex-col h-full shadow-lg z-10 flex-shrink-0">
+        <div class="p-5 bg-ford-blue text-white">
+            <h1 class="text-lg font-bold tracking-tight">27MY Explorer Repricing sell-down</h1>
+            <p class="text-xs text-blue-200 mt-1">This tool is not generalizable.</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-5 space-y-6">
+            
+            <!-- Global Scenario Selector -->
+            <div>
+                <label class="block text-sm font-bold text-gray-900 mb-2 flex items-center">
+                    <i data-lucide="folder-tree" class="w-4 h-4 mr-1 text-blue-600"></i> Repricing Strategy
+                </label>
+                <select id="scenario-selector" class="w-full border-gray-300 rounded-md shadow-sm text-sm p-2 border focus:ring-blue-500 focus:border-blue-500 bg-blue-50 font-medium cursor-pointer">
+                    <option value="custom">Custom Sandbox</option>
+                    <option value="profit_optimal">1. True Profit Optimal</option>
+                    <option value="hold_active" selected>2. Hold Active, Limit Tremor</option>
+                </select>
+                <p class="text-[11px] text-gray-500 mt-2">Sets target CFTPs and implicit profit generation based on YM sprint data.</p>
+            </div>
+
+            <hr class="border-gray-200">
+            
+            <!-- Strategic Variables -->
+            <div>
+                <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center">
+                    <i data-lucide="activity" class="w-4 h-4 mr-1"></i> Market Conditions
+                </h3>
+                
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                        <div class="flex justify-between text-sm mb-1">
+                            <label class="font-medium text-gray-700">Target Annual Gain</label>
+                            <span id="val-target-gain" class="font-bold text-green-600">+$7.6M</span>
+                        </div>
+                        <p class="text-[10px] text-gray-500 leading-tight">Implicit run-rate linked to selected strategy.</p>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <label class="font-medium text-gray-700" title="Accounts for RV degradation">Lease Stigma Multiplier</label>
+                            <span id="val-lease-stigma" class="font-bold">1.00x</span>
+                        </div>
+                        <input type="range" id="lease-stigma" min="1.0" max="1.5" step="0.05" value="1.0" class="w-full">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Market Drift (Entropy Decay)</label>
+                        <select id="market-drift" class="w-full border-gray-300 rounded-md shadow-sm text-xs p-2 border focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+                            <option value="0">None (Static Run-Rate)</option>
+                            <option value="0.008">Low (~10% Annual Entropy)</option>
+                            <option value="0.018" selected>Medium (~20% Annual Drift)</option>
+                            <option value="0.035">High (~35% Rapid Shift)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Projection Horizon</label>
+                        <select id="horizon" class="w-full border-gray-300 rounded-md shadow-sm text-xs p-2 border focus:ring-blue-500 focus:border-blue-500 cursor-pointer">
+                            <option value="24">24 Months (MYCO Focus)</option>
+                            <option value="36">36 Months</option>
+                            <option value="60" selected>60 Months (Long-Term Value)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- Entity Adjustments -->
+            <div>
+                <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
+                    <i data-lucide="sliders" class="w-4 h-4 mr-1"></i> CFTP Adjustments
+                </h3>
+                <p class="text-[10px] text-gray-500 mb-3 leading-tight border-l-2 border-red-400 pl-2">
+                    <strong>Negative values</strong> = Price Drops. Only price drops incur incremental VM costs to clear 26MY stock.
+                </p>
+                
+                <div class="space-y-3" id="trim-sliders">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div class="flex-1 flex flex-col h-full bg-gray-50 overflow-hidden">
+        
+        <!-- Top Metrics -->
+        <div class="p-6 grid grid-cols-4 gap-4 bg-white border-b border-gray-200 flex-shrink-0">
+            <div class="bg-red-50 p-4 rounded-lg border border-red-100 shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-2 opacity-10"><i data-lucide="trending-down" class="w-12 h-12"></i></div>
+                <p class="text-sm font-medium text-red-600 mb-1">26MY Sell-Down Cost</p>
+                <h2 id="kpi-cost" class="text-2xl font-bold text-red-700">-$0.00M</h2>
+                <p class="text-xs text-red-500 mt-1">Total Incremental VM</p>
+            </div>
+            
+            <div class="bg-green-50 p-4 rounded-lg border border-green-100 shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-2 opacity-10"><i data-lucide="trending-up" class="w-12 h-12"></i></div>
+                <p class="text-sm font-medium text-green-600 mb-1">27MY Lifecycle Gain</p>
+                <h2 id="kpi-gain" class="text-2xl font-bold text-green-700">+$0.00M</h2>
+                <p class="text-xs text-green-600 mt-1 font-medium" id="kpi-gain-label">Over 60 Months</p>
+            </div>
+            
+            <div id="kpi-net-card" class="bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-2 opacity-10"><i data-lucide="wallet" class="w-12 h-12"></i></div>
+                <p class="text-sm font-medium text-blue-600 mb-1">Cumulative Net Impact</p>
+                <h2 id="kpi-net" class="text-2xl font-bold text-blue-700">+$0.00M</h2>
+                <p class="text-xs text-blue-500 mt-1 font-medium">Total ROI Value</p>
+            </div>
+
+            <div class="bg-gray-100 p-4 rounded-lg border border-gray-200 flex flex-col justify-center items-center shadow-sm">
+                <p class="text-sm font-medium text-gray-500 mb-1">Break-Even Point</p>
+                <h2 id="kpi-breakeven" class="text-xl font-bold text-gray-800">Month X</h2>
+                <p class="text-xs text-gray-500 mt-1 font-medium" id="kpi-breakeven-date">Date</p>
+            </div>
+        </div>
+
+        <!-- Chart Area -->
+        <div class="flex-1 p-6 relative min-h-0">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 h-full flex flex-col">
+                <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-800">Cumulative Cash Flow vs. Market Drift</h2>
+                        <p class="text-[11px] text-gray-500">Models 53,037 unit 26MY runout + 10k/yr 27MY volume decay</p>
+                    </div>
+                    <div class="flex items-center text-xs text-gray-500 space-x-4">
+                        <span class="flex items-center"><span class="w-3 h-3 bg-red-400 rounded-sm mr-1"></span> Monthly Cost</span>
+                        <span class="flex items-center"><span class="w-3 h-3 bg-green-400 rounded-sm mr-1"></span> Monthly Profit</span>
+                        <span class="flex items-center"><span class="w-3 h-1 bg-blue-600 rounded-sm mr-1"></span> Cumulative Net</span>
+                    </div>
+                </div>
+                <div class="relative flex-1 w-full min-h-0">
+                    <canvas id="roiChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // 1. DATA MODEL & LUIS'S BASELINES
+        // Demand mix approximating 26MY Inventory Mix for accurate sell-down modeling
+        const entities = [
+            { id: 'tremor_30', name: 'Tremor 4x4 3.0L', mix: 0.054 },
+            { id: 'st_4x4_30', name: 'ST 4x4 3.0L', mix: 0.139 },
+            { id: 'plat_4x4_30', name: 'Platinum 4x4 3.0L', mix: 0.060 },
+            { id: 'st_4x2_30', name: 'ST 4x2 3.0L', mix: 0.011 },
+            { id: 'plat_4x2_30', name: 'Platinum 4x2 3.0L', mix: 0.008 },
+            { id: 'plat_4x4_23', name: 'Platinum 4x4 2.3L', mix: 0.087 },
+            { id: 'tremor_23', name: 'Tremor 4x4 2.3L', mix: 0.020 },
+            { id: 'plat_4x2_23', name: 'Platinum 4x2 2.3L', mix: 0.021 },
+            { id: 'stline_4x4_23', name: 'StLine 4x4 2.3L', mix: 0.180 },
+            { id: 'stline_4x2_23', name: 'StLine 4x2 2.3L', mix: 0.080 },
+            { id: 'active_4x4_23', name: 'Active 4x4 2.3L', mix: 0.240 },
+            { id: 'active_4x2_23', name: 'Active 4x2 2.3L', mix: 0.100 }
+        ];
+
+        // Scenario Presets (CFTP Change) - Matched to Slides
+        const scenarios = {
+            'profit_optimal': {
+                targetGain: 14.5,
+                cftps: {
+                    'tremor_30': -982, 'st_4x4_30': -2321, 'plat_4x4_30': -2670, 'st_4x2_30': -3274, 
+                    'plat_4x2_30': -3475, 'plat_4x4_23': -2198, 'tremor_23': 3162, 'plat_4x2_23': -1884, 
+                    'stline_4x4_23': 48, 'stline_4x2_23': 491, 'active_4x4_23': 801, 'active_4x2_23': 1248
+                }
+            },
+            'hold_active': {
+                targetGain: 7.6,
+                cftps: {
+                    'tremor_30': 283, 'st_4x4_30': -1030, 'plat_4x4_30': -1389, 'st_4x2_30': -2001, 
+                    'plat_4x2_30': -2325, 'plat_4x4_23': -1283, 'tremor_23': 2100, 'plat_4x2_23': -983, 
+                    'stline_4x4_23': 1105, 'stline_4x2_23': 800, 'active_4x4_23': 0, 'active_4x2_23': 0
+                }
+            }
+        };
+
+        // Current UI State
+        let currentTargetGain = scenarios['hold_active'].targetGain;
+
+        // Dynamic Label Generator
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const generateLabels = (months) => {
+            let labels = [];
+            let m = 7; // Aug (0-indexed)
+            let y = 2026;
+            for(let i=0; i<months; i++) {
+                labels.push(`${monthNames[m]} '${y.toString().slice(-2)}`);
+                m++;
+                if(m > 11) { m = 0; y++; }
+            }
+            return labels;
+        };
+
+        // Luis's EXACT Volume Curves
+        // 26MY Full Runout Curve (Aug '26 -> Apr '27) = 53,037 total units
+        const vol26MY_base = [11697, 10783, 9348, 7376, 6043, 4100, 2200, 1030, 460]; 
+        // 27MY Ramp (17 months), then decays
+        const vol27MY_base = [3802, 4216, 6152, 6524, 12157, 7600, 10400, 13970, 13440, 14900, 13500, 14100, 13200, 13700, 14200, 13493, 7236];
+        const steadyState27MY = 13500; // ~162k annualized
+
+        let chartInstance = null;
+        let isProgrammaticChange = false;
+
+        // 2. INITIALIZE UI SLIDERS
+        const trimContainer = document.getElementById('trim-sliders');
+        entities.forEach(entity => {
+            const div = document.createElement('div');
+            const initialVal = scenarios['hold_active'].cftps[entity.id];
+            div.innerHTML = `
+                <div class="flex justify-between items-end mb-1">
+                    <label class="text-[11px] font-semibold text-gray-700 leading-tight">${entity.name} <span class="font-normal text-gray-400 block">Inv. Mix: ${(entity.mix*100).toFixed(1)}%</span></label>
+                    <span id="val-${entity.id}" class="text-xs font-bold ${initialVal < 0 ? 'text-red-600' : 'text-green-600'}">${initialVal > 0 ? '+' : ''}$${initialVal}</span>
+                </div>
+                <input type="range" id="slider-${entity.id}" data-trim="${entity.id}" min="-4000" max="3500" step="10" value="${initialVal}">
+            `;
+            trimContainer.appendChild(div);
+        });
+
+        // 3. CALCULATION ENGINE
+        function calculateData() {
+            const horizon = parseInt(document.getElementById('horizon').value);
+            const leaseStigma = parseFloat(document.getElementById('lease-stigma').value);
+            const driftRate = parseFloat(document.getElementById('market-drift').value);
+
+            // Per-Unit Profit is isolated. It doesn't break if volume changes.
+            // Based on $14.5M or $7.6M against steady-state run rate (162k)
+            const annualVolumeRunRate = 162000;
+            const perUnitProfit = (currentTargetGain * 1000000) / annualVolumeRunRate;
+
+            let cumulativeNet = 0;
+            let totalCost = 0;
+            let totalGain = 0;
+            let breakEvenIndex = -1;
+            
+            const dataCost = [];
+            const dataGain = [];
+            const dataNet = [];
+
+            for (let i = 0; i < horizon; i++) {
+                
+                // --- 26MY COST LOGIC ---
+                const vol26 = i < vol26MY_base.length ? vol26MY_base[i] : 0;
+                let monthCost = 0;
+                
+                if (vol26 > 0) {
+                    entities.forEach(entity => {
+                        const cftpChange = parseFloat(document.getElementById(`slider-${entity.id}`).value);
+                        // CRITICAL LOGIC: Ford only pays for price drops. MSRP raises don't generate VM refunds.
+                        const penalty = Math.max(0, -cftpChange); 
+                        monthCost += (vol26 * entity.mix) * penalty * leaseStigma;
+                    });
+                }
+                monthCost = -monthCost; // Store as negative outflow
+                
+                // --- 27MY PROFIT LOGIC ---
+                let vol27 = 0;
+                if (i < vol27MY_base.length) {
+                    vol27 = vol27MY_base[i];
+                } else {
+                    // Introduce the 10,000 unit/year volume decay post-launch ramp
+                    const yearsPastRamp = (i - vol27MY_base.length) / 12;
+                    const monthlyDecay = yearsPastRamp * (10000 / 12);
+                    vol27 = Math.max(0, steadyState27MY - monthlyDecay);
+                }
+
+                const driftExponent = Math.max(0, i - 12); // Drift entropy starts after Year 1
+                const driftMultiplier = Math.exp(-driftRate * driftExponent);
+                
+                const monthGain = (vol27 * perUnitProfit) * driftMultiplier;
+
+                // Tabulate
+                const monthNet = monthCost + monthGain;
+                cumulativeNet += monthNet;
+
+                totalCost += monthCost;
+                totalGain += monthGain;
+
+                dataCost.push(monthCost);
+                dataGain.push(monthGain);
+                dataNet.push(cumulativeNet);
+
+                // Break Even Logic
+                if (cumulativeNet >= 0 && monthCost === 0 && breakEvenIndex === -1 && i > 0 && dataNet[i-1] < 0) {
+                    breakEvenIndex = i;
+                }
+            }
+
+            updateUI(totalCost, totalGain, cumulativeNet, breakEvenIndex, horizon, dataCost, dataGain, dataNet);
+        }
+
+        // 4. UI & CHART UPDATES
+        function updateUI(totalCost, totalGain, net, breakEvenIdx, horizon, dataCost, dataGain, dataNet) {
+            const formatM = (num) => (num >= 0 ? '+' : '-') + '$' + Math.abs(num / 1000000).toFixed(1) + 'M';
+
+            document.getElementById('val-target-gain').textContent = `+$${currentTargetGain.toFixed(1)}M`;
+            document.getElementById('kpi-cost').textContent = formatM(totalCost);
+            document.getElementById('kpi-gain').textContent = formatM(totalGain);
+            document.getElementById('kpi-gain-label').textContent = `Over ${horizon} Months`;
+            document.getElementById('kpi-net').textContent = formatM(net);
+
+            const netCard = document.getElementById('kpi-net-card');
+            if(net >= 0) {
+                netCard.className = "bg-blue-50 p-4 rounded-lg border border-blue-200 shadow-sm relative overflow-hidden";
+                document.getElementById('kpi-net').className = "text-2xl font-bold text-blue-700";
+            } else {
+                netCard.className = "bg-red-50 p-4 rounded-lg border border-red-200 shadow-sm relative overflow-hidden";
+                document.getElementById('kpi-net').className = "text-2xl font-bold text-red-700";
+            }
+
+            const labels = generateLabels(horizon);
+            if (breakEvenIdx !== -1) {
+                document.getElementById('kpi-breakeven').textContent = `Month ${breakEvenIdx + 1}`;
+                document.getElementById('kpi-breakeven').className = "text-xl font-bold text-green-600";
+                document.getElementById('kpi-breakeven-date').textContent = labels[breakEvenIdx];
+            } else if (net < 0) {
+                document.getElementById('kpi-breakeven').textContent = "Never";
+                document.getElementById('kpi-breakeven').className = "text-xl font-bold text-red-600";
+                document.getElementById('kpi-breakeven-date').textContent = "Within Horizon";
+            } else {
+                document.getElementById('kpi-breakeven').textContent = "Immediate";
+                document.getElementById('kpi-breakeven').className = "text-xl font-bold text-green-600";
+                document.getElementById('kpi-breakeven-date').textContent = "No Major Cost";
+            }
+
+            renderChart(labels, dataCost, dataGain, dataNet);
+        }
+
+        function renderChart(labels, dataCost, dataGain, dataNet) {
+            const ctx = document.getElementById('roiChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Cumulative Net ($)',
+                            data: dataNet,
+                            borderColor: '#003478',
+                            backgroundColor: 'rgba(0, 52, 120, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            type: 'line',
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Monthly Profit ($)',
+                            data: dataGain,
+                            backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                            type: 'bar',
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Monthly Sell-Down Cost ($)',
+                            data: dataCost,
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            type: 'bar',
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        const isNeg = context.parsed.y < 0;
+                                        label += (isNeg ? '-' : '') + '$' + Math.abs(context.parsed.y / 1000000).toFixed(2) + 'M';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                            grid: { color: '#e5e7eb', drawBorder: false },
+                            ticks: { callback: function(value) { return '$' + (value / 1000000).toFixed(0) + 'M'; } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 5. EVENT LISTENERS
+        document.getElementById('scenario-selector').addEventListener('change', (e) => {
+            const scenario = e.target.value;
+            if (scenario !== 'custom') {
+                isProgrammaticChange = true;
+                currentTargetGain = scenarios[scenario].targetGain;
+                
+                entities.forEach(entity => {
+                    const slider = document.getElementById(`slider-${entity.id}`);
+                    const valSpan = document.getElementById(`val-${entity.id}`);
+                    const newVal = scenarios[scenario].cftps[entity.id];
+                    slider.value = newVal;
+                    valSpan.textContent = `${newVal > 0 ? '+' : ''}$${newVal}`;
+                    valSpan.className = `text-xs font-bold ${newVal < 0 ? 'text-red-600' : (newVal > 0 ? 'text-green-600' : 'text-gray-900')}`;
+                });
+                
+                isProgrammaticChange = false;
+                calculateData();
+            }
+        });
+
+        const inputs = ['lease-stigma', 'market-drift', 'horizon'];
+        inputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', (e) => {
+                if(id === 'lease-stigma') document.getElementById('val-lease-stigma').textContent = `${parseFloat(e.target.value).toFixed(2)}x`;
+                calculateData();
+            });
+        });
+
+        entities.forEach(entity => {
+            document.getElementById(`slider-${entity.id}`).addEventListener('input', (e) => {
+                if (!isProgrammaticChange) document.getElementById('scenario-selector').value = 'custom';
+                const val = parseFloat(e.target.value);
+                const valSpan = document.getElementById(`val-${entity.id}`);
+                valSpan.textContent = `${val > 0 ? '+' : ''}$${val}`;
+                valSpan.className = `text-xs font-bold ${val < 0 ? 'text-red-600' : (val > 0 ? 'text-green-600' : 'text-gray-900')}`;
+                calculateData();
+            });
+        });
+
+        // Initial Calc
+        calculateData();
+
+    </script>
+</body>
+</html>
