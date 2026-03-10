@@ -98,6 +98,15 @@
                             <option value="60" selected>60 Months (Long-Term Value)</option>
                         </select>
                     </div>
+
+                    <!-- NEW: Y-Axis Lock for Presentation Screenshots -->
+                    <div class="pt-2 border-t border-gray-200 mt-4">
+                        <label class="flex items-center cursor-pointer mt-3">
+                            <input type="checkbox" id="lock-y-axis" class="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
+                            <span class="ml-2 text-sm font-medium text-gray-700">Lock Y-Axis Scale</span>
+                        </label>
+                        <p class="text-[10px] text-gray-500 mt-1 ml-6 leading-tight">Locks bounds from -$30M to +$25M to capture side-by-side presentation screenshots with accurate magnitude.</p>
+                    </div>
                 </div>
             </div>
 
@@ -372,6 +381,9 @@
             const ctx = document.getElementById('roiChart').getContext('2d');
             if (chartInstance) chartInstance.destroy();
 
+            // NEW: Read the lock Y-axis checkbox state
+            const lockYAxis = document.getElementById('lock-y-axis').checked;
+
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -425,10 +437,19 @@
                         }
                     },
                     scales: {
-                        x: { grid: { display: false } },
+                        x: { 
+                            grid: { display: false },
+                            ticks: { font: { weight: 'bold' } }
+                        },
                         y: {
                             grid: { color: '#e5e7eb', drawBorder: false },
-                            ticks: { callback: function(value) { return '$' + (value / 1000000).toFixed(0) + 'M'; } }
+                            ticks: { 
+                                callback: function(value) { return '$' + (value / 1000000).toFixed(0) + 'M'; },
+                                font: { weight: 'bold' }
+                            },
+                            // NEW: Apply fixed bounds if checked
+                            min: lockYAxis ? -30000000 : undefined,
+                            max: lockYAxis ? 25000000 : undefined
                         }
                     }
                 }
@@ -474,6 +495,9 @@
                 calculateData();
             });
         });
+
+        // NEW: Event Listener for the Y-Axis Lock Checkbox
+        document.getElementById('lock-y-axis').addEventListener('change', calculateData);
 
         // Initial Calc
         calculateData();
