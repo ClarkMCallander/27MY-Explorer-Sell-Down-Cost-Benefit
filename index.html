@@ -176,7 +176,7 @@
                         <h3 class="text-sm font-bold text-indigo-900 flex items-center">
                             <i data-lucide="sparkles" class="w-4 h-4 mr-1"></i> Boardroom AI Assistant
                         </h3>
-                        <p class="text-xs text-indigo-700 mt-0.5">Use Gemini to analyze the current data and anticipate potential psuhback.</p>
+                        <p class="text-xs text-indigo-700 mt-0.5">Use Gemini 2.5 to analyze the current data and prep for your presentation.</p>
                     </div>
                     <div class="flex space-x-2">
                         <button id="btn-generate-summary" class="bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-xs font-semibold py-2 px-3 rounded transition-colors flex items-center shadow-sm">
@@ -393,7 +393,14 @@
 
         // Luis's EXACT Volume Curves for 26MY Runout & 27MY Launch
         const vol26MY_base = [11697, 10783, 9348, 7376, 6043, 4100, 2200, 1030, 460]; 
-        const vol27MY_base = [3802, 4216, 6152, 6524, 12157, 7600, 10400, 13970, 13440, 14900, 13500, 14100, 13200, 13700, 14200, 13493, 7236];
+        // Updated Dec '27 from 14000 to 17500 to match the exact Dec '27 total nameplate volume from the new data
+        const vol27MY_base = [3802, 4216, 6152, 6524, 12157, 7600, 10400, 13970, 13440, 14900, 13500, 14100, 13200, 13700, 14200, 13493, 17500];
+
+        // 2027 Monthly Seasonality Weights (Jan - Dec) derived from the 168k total array
+        const seasonalityWeights = [
+            11.7/168, 12.6/168, 15.0/168, 13.9/168, 14.9/168, 13.5/168, 
+            14.1/168, 13.2/168, 13.7/168, 14.2/168, 13.7/168, 17.5/168
+        ];
 
         let chartInstance = null;
         let isProgrammaticChange = false;
@@ -446,23 +453,23 @@
                     });
                 }
                 monthCost = -monthCost; // Store as negative outflow
-                
-                // --- 27MY PROFIT LOGIC (With updated cycle plan volumes) ---
+                // --- 27MY PROFIT LOGIC (With updated cycle plan volumes & Seasonality) ---
                 let vol27 = 0;
                 // Calculate actual calendar year (Start Month is Aug / 7, zero-indexed)
                 const currentYear = 2026 + Math.floor((i + 7) / 12); 
+                const currentMonthIndex = (i + 7) % 12; // 0 = Jan, 11 = Dec
 
                 if (i < vol27MY_base.length) {
                     // Use Luis's exact ramp curve for the first 17 months
                     vol27 = vol27MY_base[i];
                 } else {
-                    // Use the newly provided annual cycle plan volumes for out-years
+                    // Use the annual cycle plan volumes for out-years, distributed by seasonality
                     if (currentYear === 2028) {
-                        vol27 = 131000 / 12;
+                        vol27 = 131000 * seasonalityWeights[currentMonthIndex];
                     } else if (currentYear >= 2029) {
-                        vol27 = 136000 / 12; // Flatline from 2029 assumption
+                        vol27 = 136000 * seasonalityWeights[currentMonthIndex];
                     } else {
-                        vol27 = 168000 / 12; // Fallback
+                        vol27 = 168000 * seasonalityWeights[currentMonthIndex]; // Fallback
                     }
                 }
 
